@@ -1,0 +1,21 @@
+# Local videos, settings, API keys, OAuth tokens and downloaded models
+workspace/
+whisper-small/
+.env
+.env.*
+!.env.example
+cookies*.txt
+settings.json
+client_secret*.json
+token*.json
+# Python and temporary output
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.log
+clipper-log.txt
+*.zip
+# Old local update packages
+clipper-*-update/
+update-clipper-*.bat

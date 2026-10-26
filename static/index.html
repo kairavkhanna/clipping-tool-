@@ -1,0 +1,1558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clipper</title>
+<style>
+  :root {
+    --paper: #eceff5;
+    --panel: #ffffff;
+    --panel-2: #f4f6fb;
+    --ink: #171c2b;
+    --muted: #666f86;
+    --line: #d6dbe7;
+    --tick: #dfe3ee;
+    --range: #2b44e8;
+    --range-soft: rgba(43, 68, 232, .13);
+    --playhead: #f0483e;
+    --danger: #b3261e;
+    --sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Roboto, system-ui, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #101320;
+      --panel: #181c2c;
+      --panel-2: #1f2437;
+      --ink: #e9ecf6;
+      --muted: #98a1bb;
+      --line: #2c3350;
+      --tick: #2a3049;
+      --range: #7d90ff;
+      --range-soft: rgba(125, 144, 255, .18);
+      --playhead: #ff6b61;
+      --danger: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--paper); }
+  body { margin: 0; font: 15px/1.5 var(--sans); color: var(--ink); background: var(--paper); }
+  h1, h2, h3, p, ul { margin: 0; padding: 0; }
+  ul { list-style: none; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--range); outline-offset: 2px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  [hidden] { display: none !important; }
+
+  .app { display: grid; grid-template-columns: 330px minmax(0, 1fr); min-height: 100vh; }
+  .side { padding: 24px 20px; border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; gap: 26px; }
+  .brand { font: 600 26px/1 var(--serif); letter-spacing: -.01em; }
+  .side h2, .clips-head h2 { font: 600 17px/1.3 var(--serif); margin-bottom: 10px; }
+
+  .drop { display: block; padding: 20px 14px; border: 1.5px dashed var(--line); border-radius: 10px; text-align: center; color: var(--muted); cursor: pointer; background: var(--panel-2); }
+  .drop:hover, .drop.over { border-color: var(--range); color: var(--ink); background: var(--range-soft); }
+  .drop strong { color: var(--ink); font-weight: 600; }
+  .yt { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
+  .yt input[type=url] { grid-column: 1 / -1; }
+  .yt input[type=password] { grid-column: 1 / -1; }
+  input[type=url], input[type=text], input[type=password], textarea, select { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+  .btn { padding: 9px 15px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-weight: 600; }
+  .btn:hover { border-color: var(--range); }
+  .btn.primary { background: var(--range); border-color: var(--range); color: #fff; }
+  @media (prefers-color-scheme: dark) { .btn.primary { color: #0e1226; } }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .hint { margin-top: 10px; font-size: 13px; color: var(--muted); }
+
+  .jobs { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .job { padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); font-size: 13px; }
+  .job .msg { overflow-wrap: anywhere; }
+  .job .label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .job .bar { height: 4px; margin-top: 7px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  .job .bar i { display: block; height: 100%; width: 0; background: var(--range); transition: width .3s; }
+  .job.error { border-color: var(--danger); }
+  .job.error .msg { color: var(--danger); }
+  .job button { margin-top: 6px; padding: 0; border: 0; background: none; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: 13px; }
+
+  .src { display: flex; align-items: stretch; border: 1px solid transparent; border-radius: 6px; }
+  .src.on { border-color: var(--range); background: var(--range-soft); }
+  .src-main { flex: 1; min-width: 0; text-align: left; padding: 8px 10px; border: 0; background: none; cursor: pointer; }
+  .src:not(.on):hover { background: var(--panel-2); }
+  .src-title { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .src-meta { display: flex; gap: 10px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .icon { width: 34px; border: 0; background: none; color: var(--muted); font-size: 20px; cursor: pointer; border-radius: 6px; }
+  .icon:hover { color: var(--danger); }
+
+  main { padding: 26px clamp(16px, 3vw, 40px) 60px; min-width: 0; }
+  .empty { padding: 60px 0 30px; max-width: 46ch; }
+  .empty h2 { font: 600 30px/1.2 var(--serif); margin-bottom: 10px; }
+  .editor-head h2 { font: 600 24px/1.25 var(--serif); overflow-wrap: anywhere; }
+  .editor-head p { margin-top: 2px; font-size: 14px; color: var(--muted); }
+  .editor-head a { color: var(--range); }
+  .stage { margin-top: 16px; }
+  video { display: block; width: 100%; max-height: 58vh; border-radius: 8px; background: #0a0c14; }
+
+  .timeline { margin-top: 26px; padding: 0 8px; }
+  .track { position: relative; height: 64px; border-radius: 6px; border: 1px solid var(--line); cursor: pointer; touch-action: none;
+    background: repeating-linear-gradient(90deg, var(--tick) 0 1px, transparent 1px 24px), var(--panel-2); }
+  .sel { position: absolute; top: 0; bottom: 0; left: calc(var(--s) * 1%); right: calc((100 - var(--e)) * 1%);
+    background: var(--range-soft); border-top: 3px solid var(--range); border-bottom: 3px solid var(--range); pointer-events: none; }
+  .handle { position: absolute; top: -7px; bottom: -7px; width: 16px; background: var(--range); cursor: ew-resize; touch-action: none; }
+  .handle::before { content: ""; position: absolute; inset: -6px -12px; }
+  .handle::after { content: ""; position: absolute; top: 50%; left: 50%; width: 2px; height: 18px; margin: -9px 0 0 -1px; background: #fff; border-radius: 1px; }
+  @media (prefers-color-scheme: dark) { .handle::after { background: #0e1226; } }
+  .handle.start { left: calc(var(--s) * 1%); border-radius: 5px 0 0 5px; }
+  .handle.end { left: calc(var(--e) * 1%); transform: translateX(-100%); border-radius: 0 5px 5px 0; }
+  .playhead { position: absolute; top: -9px; bottom: -9px; left: calc(var(--p) * 1%); width: 2px; margin-left: -1px; background: var(--playhead); pointer-events: none; }
+  .playhead::before { content: ""; position: absolute; top: 0; left: 50%; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--playhead); }
+  .scale { display: flex; justify-content: space-between; margin-top: 12px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .range-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin-top: 18px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .field .row { display: flex; gap: 8px; align-items: center; }
+  .field .row .btn { white-space: nowrap; }
+  .field input { font-variant-numeric: tabular-nums; }
+  .len { font: 600 22px/1.6 var(--sans); font-variant-numeric: tabular-nums; }
+  .keys { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  kbd { padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--panel); font: 12px var(--sans); }
+
+  .export { margin-top: 24px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
+  .export .btn { height: 40px; }
+  #formMsg { grid-column: 1 / -1; font-size: 14px; color: var(--danger); }
+  #formMsg:empty { display: none; }
+
+  .clips-section { margin-top: 44px; }
+  .clip-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .clip { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); overflow: hidden; display: flex; flex-direction: column; }
+  .clip video { border-radius: 0; height: 280px; max-height: none; object-fit: contain; }
+  .clip audio { width: 100%; margin-top: 12px; padding: 0 10px; }
+  .clip-body { padding: 12px 14px 14px; display: grid; gap: 4px; }
+  .clip-name { font-weight: 600; overflow-wrap: anywhere; }
+  .clip-meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .clip-actions { display: flex; gap: 10px; margin-top: 8px; }
+  .clip-actions a, .clip-actions button { font-size: 14px; font-weight: 600; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); text-decoration: none; cursor: pointer; }
+  .clip-actions a { color: var(--range); }
+  .clip-actions button:hover { color: var(--danger); }
+
+
+  .tab-title { font: 600 24px/1.25 var(--serif); }
+  textarea { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); resize: vertical; line-height: 1.5; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .tab { padding: 9px 16px; border: 0; border-bottom: 3px solid transparent; background: none; font-weight: 600; color: var(--muted); cursor: pointer; margin-bottom: -1px; }
+  .tab:hover { color: var(--ink); }
+  .tab.on { color: var(--ink); border-bottom-color: var(--range); }
+
+  .ai { margin-top: 24px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .ai h3, .script-form h3 { font: 600 19px/1.3 var(--serif); }
+  .ai-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end; margin-top: 12px; }
+  .yt-upload { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+  .yt-upload label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .ai-row .btn { height: 40px; }
+  #aiMsg { margin-top: 10px; min-height: 0; }
+  #aiMsg:empty { display: none; }
+  .moments { display: grid; gap: 10px; margin-top: 12px; }
+  .moments:empty { display: none; }
+  .moment { padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+  .moment-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .score { flex: none; padding: 1px 8px; border-radius: 10px; background: var(--range-soft); color: var(--range); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .moment p { margin-top: 4px; }
+  .short-opts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+  .script-form { display: grid; gap: 16px; max-width: 760px; }
+  .script-form .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
+  .script-form .helper { padding: 14px; border: 1px dashed var(--line); border-radius: 10px; background: var(--panel-2); }
+  .script-form .helper .grid { margin-top: 10px; }
+
+  .batch-wrap { display: grid; gap: 22px; max-width: 900px; }
+  .batch-card { padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); max-width: none; }
+  .batch-card h3 { font: 600 19px/1.3 var(--serif); }
+  .checklist { display: grid; gap: 4px; max-height: 220px; overflow: auto; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
+  .checklist label { display: flex; gap: 10px; align-items: center; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+  .checklist label:hover { background: var(--range-soft); }
+  .checklist input { flex: none; }
+  .checklist .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .checklist .d { margin-left: auto; flex: none; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .linkish { padding: 0; border: 0; background: none; color: var(--range); text-decoration: underline; cursor: pointer; font-size: 14px; }
+  .batches { display: grid; gap: 12px; }
+  .batch { padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); display: grid; gap: 8px; }
+  .batch-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .chip { padding: 1px 9px; border-radius: 10px; font-size: 13px; font-weight: 600; background: var(--panel-2); border: 1px solid var(--line); }
+  .chip.running { background: var(--range-soft); color: var(--range); border-color: transparent; }
+  .chip.done.bad { color: var(--danger); }
+  .bigbar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .bigbar i { display: block; height: 100%; width: 0; background: var(--range); transition: width .4s; }
+  .batch-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .batch-actions button, .batch-actions a, .clips-tools button, .clips-tools a { font-size: 14px; font-weight: 600; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); text-decoration: none; cursor: pointer; color: var(--ink); }
+  .batch-actions a { color: var(--range); }
+  .batch-actions .danger:hover { color: var(--danger); }
+  .batch details summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+  .batch-items { margin-top: 8px; max-height: 260px; overflow: auto; display: grid; gap: 2px; font-size: 14px; }
+  .batch-items li { display: flex; gap: 10px; align-items: baseline; }
+  .batch-items .s { flex: none; width: 64px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .batch-items .s.done { color: var(--range); }
+  .batch-items .s.error { color: var(--danger); }
+  .batch-items .l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clips-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .clips-more { margin-top: 16px; text-align: center; }
+  .clips-more button { padding: 9px 18px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); font-weight: 600; cursor: pointer; }
+
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; }
+    .side { border-right: 0; border-bottom: 1px solid var(--line); }
+    .export { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) { .job .bar i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <h1 class="brand">Clipper</h1>
+
+    <section>
+      <h2>Add a video</h2>
+      <label class="drop" id="drop">
+        <strong>Choose a file</strong> or drop it here
+        <input type="file" id="file" accept="video/*,audio/*" multiple hidden>
+      </label>
+      <form class="yt" id="ytForm">
+        <input type="url" id="ytUrl" placeholder="Paste a YouTube link" required aria-label="YouTube link">
+        <select id="ytQuality" aria-label="Download quality">
+          <option value="480">480p</option>
+          <option value="720" selected>720p</option>
+          <option value="1080">1080p</option>
+          <option value="best">Best available</option>
+        </select>
+        <button class="btn" id="ytGo" type="submit">Download</button>
+      </form>
+      <p class="hint" id="ytHint">Only download videos you own or have permission to reuse.</p>
+      <ul class="jobs" id="jobs" aria-live="polite"></ul>
+    </section>
+
+    <section>
+      <h2>Library</h2>
+      <ul id="sources"></ul>
+    </section>
+
+    <section>
+      <h2>AI settings</h2>
+      <form class="yt" id="aiForm">
+        <input type="password" id="aiKey" placeholder="Gemini or Anthropic API key" autocomplete="off" aria-label="Gemini or Anthropic API key">
+        <button class="btn" type="submit">Save key</button>
+        <button class="btn" type="button" id="aiClear" hidden>Remove</button>
+      </form>
+      <p class="hint" id="aiStatus"></p>
+      <p class="hint">The key powers "Find the best moments" and "Write with AI". Paste a Gemini key (free tier, get one at aistudio.google.com/app/apikey) or an Anthropic key (pay as you go, console.anthropic.com). It is saved in Clipper's data folder.</p>
+
+
+    <section id="ytConnectSection">
+      <h2>Publish to YouTube</h2>
+      <div id="ytConnected" hidden>
+        <p class="hint">Connected as <strong id="ytChannelName"></strong>.</p>
+        <button class="btn" type="button" id="ytDisconnect">Disconnect</button>
+      </div>
+      <form class="yt" id="ytCredForm">
+        <input type="text" id="ytClientId" placeholder="Google Client ID" autocomplete="off">
+        <input type="password" id="ytClientSecret" placeholder="Google Client Secret" autocomplete="off">
+        <button class="btn" type="submit" id="ytConnectBtn">Connect</button>
+      </form>
+      <p class="hint" id="ytConnectStatus"></p>
+      <p class="hint">Uploads a finished clip straight to your own channel. Needs a free Client ID and
+        Client Secret from your own Google Cloud project &mdash; see <code>YouTube_SETUP.md</code> in the
+        Clipper folder for the one-time, 5-minute setup. Nothing is sent anywhere except Google.</p>
+    </section>
+    </section>
+  </aside>
+
+  <main>
+    <nav class="tabs" role="tablist">
+      <button class="tab on" type="button" role="tab" aria-selected="true" data-tab="clip">Clip a video</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="script">Script to video</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="batch">Batch</button>
+    </nav>
+
+    <div id="tab-clip">
+    <div class="empty" id="empty">
+      <h2>Add a video to start clipping</h2>
+      <p class="muted">Upload a file or paste a YouTube link on the left. Then set a start and an end on the timeline and create your clip.</p>
+    </div>
+
+    <div id="editor" hidden>
+      <div class="editor-head">
+        <h2 id="srcTitle"></h2>
+        <p id="srcMeta"></p>
+      </div>
+      <div class="stage"><video id="player" controls playsinline preload="metadata"></video></div>
+
+      <div class="timeline">
+        <div class="track" id="track">
+          <div class="sel"></div>
+          <div class="handle start" id="hStart" role="slider" tabindex="0" aria-label="Clip start"></div>
+          <div class="handle end" id="hEnd" role="slider" tabindex="0" aria-label="Clip end"></div>
+          <div class="playhead" id="playhead"></div>
+        </div>
+        <div class="scale"><span>0:00</span><span id="now">Playhead 0:00.0</span><span id="total"></span></div>
+      </div>
+
+      <div class="range-fields">
+        <div class="field">
+          <label for="startIn">Start</label>
+          <div class="row"><input type="text" id="startIn" inputmode="decimal" autocomplete="off"><button class="btn" type="button" id="setStart">Use playhead</button></div>
+        </div>
+        <div class="field">
+          <label for="endIn">End</label>
+          <div class="row"><input type="text" id="endIn" inputmode="decimal" autocomplete="off"><button class="btn" type="button" id="setEnd">Use playhead</button></div>
+        </div>
+        <div class="field">
+          <label>Clip length</label>
+          <div class="row"><span class="len" id="len">0:00.0</span><button class="btn" type="button" id="playSel">Play selection</button></div>
+        </div>
+      </div>
+      <p class="keys"><kbd>I</kbd> sets the start, <kbd>O</kbd> sets the end, <kbd>P</kbd> plays the selection, <kbd>Space</kbd> plays or pauses. Focus a handle and use the arrow keys to nudge it by 0.1 seconds (hold Shift for 1 second).</p>
+
+      <section class="ai" id="aiPanel">
+        <h3>Find the best moments</h3>
+        <p class="muted small">AI reads what is said in this video and suggests clips that make sense on their own. The first run transcribes the video, which can take a while on long videos.</p>
+        <div class="ai-row">
+          <div class="field"><label for="aiCount">How many</label><select id="aiCount"><option value="3">3 clips</option><option value="5" selected>5 clips</option><option value="8">8 clips</option></select></div>
+          <div class="field"><label for="aiLen">Clip length</label><select id="aiLen"><option value="15-30">15 to 30 seconds</option><option value="30-60" selected>30 to 60 seconds</option><option value="60-90">60 to 90 seconds</option></select></div>
+          <div class="field"><label for="aiLang">Speech language</label><select id="aiLang"></select></div>
+          <button class="btn primary" type="button" id="aiFind">Find moments</button>
+        </div>
+        <p class="small muted" id="aiMsg"></p>
+        <ul class="moments" id="moments"></ul>
+      </section>
+
+      <section class="ai" id="summaryPanel">
+        <h3>Summary video</h3>
+        <p class="muted small">Turn a long video into a short recap with captions, in landscape 16:9. <strong>Explained</strong>: the AI writes the story and a narrator tells it over the video's own pictures. <strong>Best scenes</strong>: keeps the original sound and joins the most important parts. The first run transcribes the whole video, which is slow for a 2 hour video, but it is saved for next time. Only use videos you own or have permission to reuse.</p>
+        <div class="ai-row">
+          <div class="field"><label for="sumMinutes">Summary length</label><select id="sumMinutes"><option value="5">About 5 minutes</option><option value="10">About 10 minutes</option><option value="15" selected>About 15 minutes</option><option value="20">About 20 minutes</option><option value="30">About 30 minutes</option></select></div>
+          <div class="field"><label for="sumStyle">Style</label><select id="sumStyle"><option value="explained">Explained by a narrator</option><option value="highlights">Best scenes, original sound</option></select></div>
+          <div class="field"><label for="sumLang">Speech language in the video</label><select id="sumLang"></select></div>
+        </div>
+        <div class="ai-row" id="sumNarrOpts">
+          <div class="field"><label for="sumNarr">Story written in</label><select id="sumNarr"><option value="english">English</option><option value="hindi">Hindi</option><option value="hinglish">Hinglish (Roman letters)</option></select></div>
+          <div class="field"><label for="sumVoice">Voice</label><select id="sumVoice"></select></div>
+          <div class="field"><label for="sumRate">Speed</label><select id="sumRate"></select></div>
+          <div class="field"><label for="sumKeep">Original sound</label><select id="sumKeep"><option value="off">Off</option><option value="quiet">Quiet, under the voice</option></select></div>
+        </div>
+        <div class="ai-row">
+          <div class="field"><label for="sumCap">Captions</label><select id="sumCap"><option value="clean" selected>Simple</option><option value="pop">Word by word</option><option value="box">Dark box</option><option value="off">No captions</option></select></div>
+          <div class="field"><label for="sumPos">Caption position</label><select id="sumPos"><option value="lower" selected>Lower third</option><option value="center">Middle</option></select></div>
+          <div class="field"><label for="sumColor">Caption colour</label><select id="sumColor" title="For word by word captions this is the colour of the word being spoken. For the other styles it is the colour of all the text."><option value="default">Default (white, yellow highlight)</option><option value="white">White</option><option value="yellow">Yellow</option><option value="orange">Orange</option><option value="red">Red</option><option value="pink">Pink</option><option value="purple">Purple</option><option value="blue">Blue</option><option value="cyan">Cyan</option><option value="green">Green</option></select></div>
+          <div class="field"><label for="smMusic">Background music</label><select id="smMusic"></select></div>
+          <div class="field" id="smMusicVolWrap" hidden><label for="smMusicVol">Music volume</label><select id="smMusicVol"><option value="0.1">Quiet</option><option value="0.2" selected>Low</option><option value="0.35">Medium</option><option value="0.6">Loud</option></select></div>
+          <div class="field" id="smMusicLenWrap" hidden><label for="smMusicLen">Music plays</label><select id="smMusicLen"><option value="0">The whole video</option><option value="1">Only the first 1 second</option><option value="2">Only the first 2 seconds</option><option value="3">Only the first 3 seconds</option><option value="5">Only the first 5 seconds</option><option value="10">Only the first 10 seconds</option></select></div>
+          <button class="btn primary" type="button" id="sumGo">Make summary video</button>
+        </div>
+        <p class="small muted" id="sumMsg"></p>
+      </section>
+
+      <form class="export" id="clipForm">
+        <div class="field">
+          <label for="clipName">Clip name (optional)</label>
+          <input type="text" id="clipName" autocomplete="off" placeholder="Leave blank to name it automatically">
+        </div>
+        <div class="field">
+          <label for="mode">Format</label>
+          <select id="mode">
+            <option value="mp4">MP4, exact cut</option>
+            <option value="copy">Fast copy, no re-encode (starts at the nearest earlier keyframe)</option>
+            <option value="mp3">MP3, audio only</option>
+            <option value="short">Vertical short (9:16) with captions</option>
+          </select>
+        </div>
+        <button class="btn primary" type="submit" id="clipGo">Create clip</button>
+        <div class="short-opts" id="shortOpts" hidden>
+          <div class="field"><label for="layout">Layout</label><select id="layout"><option value="fill">Fill the screen</option><option value="blur">Blurred background</option><option value="split">Split screen</option></select></div>
+          <div class="field" id="bgWrap" hidden><label for="bgVideo">Bottom video</label><select id="bgVideo"></select></div>
+          <div class="field" style="grid-column: 1 / -1"><label for="clHook">Hook text (optional)</label><div class="row"><input type="text" id="clHook" maxlength="200" placeholder="e.g. The agent lied about this one thing..." title="A short line of text pinned to the top of the video for its whole length, to make people keep watching."><button class="btn" type="button" id="clHookWrite">Write with AI</button></div></div>
+                    <div class="field"><label for="capStyle">Captions</label><select id="capStyle"><option value="pop">Word by word</option><option value="clean">Simple</option><option value="box">Dark box</option><option value="off">No captions</option></select></div>
+          <div class="field"><label for="capPos">Caption position</label><select id="capPos"><option value="lower">Lower third</option><option value="center">Middle</option></select></div>
+          <div class="field"><label for="capColor">Caption colour</label><select id="capColor" title="For word by word captions this is the colour of the word being spoken. For the other styles it is the colour of all the text."><option value="default">Default (white, yellow highlight)</option><option value="white">White</option><option value="yellow">Yellow</option><option value="orange">Orange</option><option value="red">Red</option><option value="pink">Pink</option><option value="purple">Purple</option><option value="blue">Blue</option><option value="cyan">Cyan</option><option value="green">Green</option></select></div>
+          <div class="field"><label for="capLang">Speech language</label><select id="capLang"></select></div>
+          <div class="field"><label for="capScript">Caption text</label><select id="capScript" title="Native: captions show the language as spoken. Hinglish: Hindi (or other Indian-language) speech is written in Roman/English letters instead."><option value="native">Native script</option><option value="hinglish">Hinglish (Roman letters)</option></select></div>
+          <div class="field"><label for="clMusic">Background music</label><select id="clMusic"></select></div>
+          <div class="field" id="clMusicVolWrap" hidden><label for="clMusicVol">Music volume</label><select id="clMusicVol"><option value="0.1">Quiet</option><option value="0.2" selected>Low</option><option value="0.35">Medium</option><option value="0.6">Loud</option></select></div>
+          <div class="field" id="clMusicLenWrap" hidden><label for="clMusicLen">Music plays</label><select id="clMusicLen"><option value="0">The whole video</option><option value="1">Only the first 1 second</option><option value="2">Only the first 2 seconds</option><option value="3">Only the first 3 seconds</option><option value="5">Only the first 5 seconds</option><option value="10">Only the first 10 seconds</option></select></div>
+        </div>
+        <p id="formMsg" role="alert"></p>
+      </form>
+    </div>
+    </div>
+
+    <div id="tab-script" hidden>
+      <form class="script-form" id="scriptForm">
+        <div>
+          <h2 class="tab-title">Make a video from a script</h2>
+          <p class="muted">Write what should be said. Clipper adds a voiceover, a background and captions, in vertical 9:16.</p>
+        </div>
+        <div class="helper">
+          <h3>Need a script? Let AI write one</h3>
+          <div class="grid">
+            <div class="field" style="grid-column: 1 / -1"><label for="aiTopic">Topic</label><input type="text" id="aiTopic" autocomplete="off" placeholder="For example: three habits of productive people"></div>
+            <div class="field"><label for="aiSeconds">Length</label><select id="aiSeconds"><option value="20">About 20 seconds</option><option value="30">About 30 seconds</option><option value="45" selected>About 45 seconds</option><option value="60">About 60 seconds</option><option value="90">About 90 seconds</option></select></div>
+            <div class="field"><label for="aiScriptLang">Language</label><select id="aiScriptLang"><option value="english">English</option><option value="hindi">Hindi (Devanagari)</option><option value="hinglish">Hinglish (Roman letters)</option></select></div>
+            <button class="btn" type="button" id="aiWrite">Write with AI</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="scriptText">Script</label>
+          <textarea id="scriptText" rows="8" maxlength="4000" placeholder="Type or paste the words the narrator should say."></textarea>
+        </div>
+        <div class="grid">
+          <div class="field"><label for="voice">Voice</label><select id="voice"></select></div>
+          <div class="field"><label for="rate">Speed</label><select id="rate"></select></div>
+          <div class="field"><label for="scriptBg">Background</label><select id="scriptBg"></select></div>
+          <div class="field"><label for="sCapStyle">Captions</label><select id="sCapStyle"><option value="pop">Word by word</option><option value="clean">Simple</option><option value="box">Dark box</option><option value="off">No captions</option></select></div>
+          <div class="field"><label for="sCapPos">Caption position</label><select id="sCapPos"><option value="center">Middle</option><option value="lower">Lower third</option></select></div>
+          <div class="field"><label for="sCapColor">Caption colour</label><select id="sCapColor" title="For word by word captions this is the colour of the word being spoken. For the other styles it is the colour of all the text."><option value="default">Default (white, yellow highlight)</option><option value="white">White</option><option value="yellow">Yellow</option><option value="orange">Orange</option><option value="red">Red</option><option value="pink">Pink</option><option value="purple">Purple</option><option value="blue">Blue</option><option value="cyan">Cyan</option><option value="green">Green</option></select></div>
+          <div class="field"><label for="scMusic">Background music</label><select id="scMusic"></select></div>
+          <div class="field" id="scMusicVolWrap" hidden><label for="scMusicVol">Music volume</label><select id="scMusicVol"><option value="0.1">Quiet</option><option value="0.2" selected>Low</option><option value="0.35">Medium</option><option value="0.6">Loud</option></select></div>
+          <div class="field" id="scMusicLenWrap" hidden><label for="scMusicLen">Music plays</label><select id="scMusicLen"><option value="0">The whole video</option><option value="1">Only the first 1 second</option><option value="2">Only the first 2 seconds</option><option value="3">Only the first 3 seconds</option><option value="5">Only the first 5 seconds</option><option value="10">Only the first 10 seconds</option></select></div>
+          <div class="field"><label for="scriptName">Name (optional)</label><input type="text" id="scriptName" autocomplete="off"></div>
+        </div>
+        <p class="hint">Voices come from a free online service, so this needs an internet connection. For a Hindi script pick a Hindi voice. To use your own footage as the background, add it to the library first.</p>
+        <div><button class="btn primary" type="submit" id="scriptGo">Make video</button> <span id="scriptMsg" class="small" style="color: var(--danger)" role="alert"></span></div>
+      </form>
+    </div>
+
+    <div id="tab-batch" hidden>
+      <div class="batch-wrap">
+        <div>
+          <h2 class="tab-title">Make lots of videos at once</h2>
+          <p class="muted">Queue as many as you like. Clipper works through them one by one, so you can leave it running. Everything lands in Your clips, and each batch can be downloaded as one zip. If something fails it is retried, and a failure never stops the rest.</p>
+        </div>
+
+        <form class="script-form batch-card" id="bsForm">
+          <h3>Voiceover videos from scripts or topics</h3>
+          <div class="grid">
+            <div class="field"><label for="bsMode">You have</label><select id="bsMode"><option value="topics">Topics (AI writes each script)</option><option value="scripts">Finished scripts</option></select></div>
+          </div>
+          <div class="helper" id="bsIdeas">
+            <h3>Need ideas? Let AI list topics</h3>
+            <div class="grid">
+              <div class="field" style="grid-column: 1 / -1"><label for="bsNiche">Niche</label><input type="text" id="bsNiche" autocomplete="off" placeholder="For example: personal finance tips for students"></div>
+              <div class="field"><label for="bsIdeaCount">How many</label><select id="bsIdeaCount"><option value="10">10 topics</option><option value="25">25 topics</option><option value="50">50 topics</option><option value="100" selected>100 topics</option></select></div>
+              <div class="field"><label for="bsIdeaLang">Language</label><select id="bsIdeaLang"><option value="english">English</option><option value="hindi">Hindi (Devanagari)</option><option value="hinglish">Hinglish (Roman letters)</option></select></div>
+              <button class="btn" type="button" id="bsIdeasGo">Generate topics</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="bsText" id="bsTextLabel">Topics, one per line</label>
+            <textarea id="bsText" rows="10" placeholder="Paste or type here"></textarea>
+            <p class="hint" id="bsCount"></p>
+          </div>
+          <div class="grid">
+            <div class="field"><label for="bsVoice">Voice</label><select id="bsVoice"></select></div>
+            <div class="field"><label for="bsRate">Speed</label><select id="bsRate"></select></div>
+            <div class="field"><label for="bsBg">Background</label><select id="bsBg"></select></div>
+            <div class="field"><label for="bsCapStyle">Captions</label><select id="bsCapStyle"><option value="pop">Word by word</option><option value="clean">Simple</option><option value="box">Dark box</option><option value="off">No captions</option></select></div>
+            <div class="field"><label for="bsCapPos">Caption position</label><select id="bsCapPos"><option value="center">Middle</option><option value="lower">Lower third</option></select></div>
+            <div class="field"><label for="bsCapColor">Caption colour</label><select id="bsCapColor" title="For word by word captions this is the colour of the word being spoken. For the other styles it is the colour of all the text."><option value="default">Default (white, yellow highlight)</option><option value="white">White</option><option value="yellow">Yellow</option><option value="orange">Orange</option><option value="red">Red</option><option value="pink">Pink</option><option value="purple">Purple</option><option value="blue">Blue</option><option value="cyan">Cyan</option><option value="green">Green</option></select></div>
+            <div class="field"><label for="bsMusic">Background music</label><select id="bsMusic"></select></div>
+          <div class="field" id="bsMusicVolWrap" hidden><label for="bsMusicVol">Music volume</label><select id="bsMusicVol"><option value="0.1">Quiet</option><option value="0.2" selected>Low</option><option value="0.35">Medium</option><option value="0.6">Loud</option></select></div>
+          <div class="field" id="bsMusicLenWrap" hidden><label for="bsMusicLen">Music plays</label><select id="bsMusicLen"><option value="0">The whole video</option><option value="1">Only the first 1 second</option><option value="2">Only the first 2 seconds</option><option value="3">Only the first 3 seconds</option><option value="5">Only the first 5 seconds</option><option value="10">Only the first 10 seconds</option></select></div>
+            <div class="field" id="bsAiOpts"><label for="bsSeconds">Script length</label><select id="bsSeconds"><option value="20">About 20 seconds</option><option value="30">About 30 seconds</option><option value="45" selected>About 45 seconds</option><option value="60">About 60 seconds</option></select></div>
+            <div class="field" id="bsLangWrap"><label for="bsLang">Script language</label><select id="bsLang"><option value="english">English</option><option value="hindi">Hindi (Devanagari)</option><option value="hinglish">Hinglish (Roman letters)</option></select></div>
+          </div>
+          <p class="hint" id="bsHint">Separate scripts with a blank line. For the free voice service, keep a short pause between videos (Clipper does this for you). Use a Hindi voice for Hindi text.</p>
+          <div><button class="btn primary" type="submit" id="bsGo">Start batch</button> <span id="bsMsg" class="small" style="color: var(--danger)" role="alert"></span></div>
+        </form>
+
+        <form class="script-form batch-card" id="bhForm">
+          <h3>Shorts from your videos</h3>
+          <div class="field">
+            <label>Videos to cut up</label>
+            <div class="checklist" id="bhSources"></div>
+            <p><button type="button" class="linkish" id="bhAll">Select all</button> <button type="button" class="linkish" id="bhNone">Clear</button></p>
+          </div>
+          <div class="grid">
+            <div class="field"><label for="bhPer">Shorts per video</label><select id="bhPer"><option value="3">3</option><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option><option value="20">20</option><option value="30">30</option><option value="50">50</option><option value="100">100</option></select></div>
+            <div class="field"><label for="bhMode">Choose the parts</label><select id="bhMode"><option value="even">Evenly spaced parts (free)</option><option value="ai">AI picks the best moments</option></select></div>
+            <div class="field" id="bhEvenWrap"><label for="bhSeg">Length of each part</label><select id="bhSeg"><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45" selected>45 seconds</option><option value="60">60 seconds</option></select></div>
+            <div class="field" id="bhAiWrap" hidden><label for="bhLen">Clip length</label><select id="bhLen"><option value="15-30">15 to 30 seconds</option><option value="30-60" selected>30 to 60 seconds</option><option value="60-90">60 to 90 seconds</option></select></div>
+            <div class="field"><label for="bhLayout">Layout</label><select id="bhLayout"><option value="fill">Fill the screen</option><option value="blur">Blurred background</option><option value="split">Split screen</option></select></div>
+            <div class="field" id="bhBgWrap" hidden><label for="bhBg">Bottom video</label><select id="bhBg"></select></div>
+            <div class="field"><label for="bhCapStyle">Captions</label><select id="bhCapStyle"><option value="pop">Word by word</option><option value="clean">Simple</option><option value="box">Dark box</option><option value="off">No captions</option></select></div>
+            <div class="field"><label for="bhCapPos">Caption position</label><select id="bhCapPos"><option value="lower">Lower third</option><option value="center">Middle</option></select></div>
+            <div class="field"><label for="bhHookMode">Hook text</label><select id="bhHookMode" title="A short line of text pinned to the top of the video for its whole length, to make people keep watching."><option value="none">No hook</option><option value="same">Same hook on every clip</option><option value="auto">Write a different hook for each clip with AI</option></select></div>
+            <div class="field" id="bhHookTextWrap" hidden><label for="bhHookText">Hook text</label><input type="text" id="bhHookText" maxlength="200" placeholder="e.g. Wait for the twist at the end..."></div>
+            <div class="field"><label for="bhCapColor">Caption colour</label><select id="bhCapColor" title="For word by word captions this is the colour of the word being spoken. For the other styles it is the colour of all the text."><option value="default">Default (white, yellow highlight)</option><option value="white">White</option><option value="yellow">Yellow</option><option value="orange">Orange</option><option value="red">Red</option><option value="pink">Pink</option><option value="purple">Purple</option><option value="blue">Blue</option><option value="cyan">Cyan</option><option value="green">Green</option></select></div>
+            <div class="field"><label for="bhLang">Speech language</label><select id="bhLang"></select></div>
+            <div class="field"><label for="bhScript">Caption text</label><select id="bhScript" title="Native: captions show the language as spoken. Hinglish: Hindi (or other Indian-language) speech is written in Roman/English letters instead."><option value="native">Native script</option><option value="hinglish">Hinglish (Roman letters)</option></select></div>
+            <div class="field"><label for="bhMusic">Background music</label><select id="bhMusic"></select></div>
+          <div class="field" id="bhMusicVolWrap" hidden><label for="bhMusicVol">Music volume</label><select id="bhMusicVol"><option value="0.1">Quiet</option><option value="0.2" selected>Low</option><option value="0.35">Medium</option><option value="0.6">Loud</option></select></div>
+          <div class="field" id="bhMusicLenWrap" hidden><label for="bhMusicLen">Music plays</label><select id="bhMusicLen"><option value="0">The whole video</option><option value="1">Only the first 1 second</option><option value="2">Only the first 2 seconds</option><option value="3">Only the first 3 seconds</option><option value="5">Only the first 5 seconds</option><option value="10">Only the first 10 seconds</option></select></div>
+          </div>
+          <p class="hint" id="bhCount"></p>
+          <div><button class="btn primary" type="submit" id="bhGo">Start batch</button> <span id="bhMsg" class="small" style="color: var(--danger)" role="alert"></span></div>
+        </form>
+
+        <section>
+          <h3 class="tab-title" style="font-size: 19px; margin-bottom: 10px;">Batches</h3>
+          <ul class="batches" id="batches"></ul>
+          <p class="muted" id="noBatches">Batches you start will show up here with live progress.</p>
+        </section>
+      </div>
+    </div>
+
+    <section id="clipsSection" class="clips-section">
+      <div class="clips-head"><h2>Your clips</h2><div class="clips-tools" id="clipsTools" hidden><a href="/api/clips.zip" download>Download all as zip</a></div></div>
+      <ul class="clip-list" id="clips"></ul>
+      <div class="clips-more" id="clipsMore" hidden><button type="button" id="clipsMoreBtn">Show more</button></div>
+      <p class="muted" id="noClips">Clips you create will show up here, ready to play and download.</p>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+  const $ = (sel) => document.querySelector(sel);
+  const el = (tag, props = {}, ...kids) => {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+      if (key === "class") node.className = value;
+      else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+      else if (value === true) node.setAttribute(key, "");
+      else if (value !== false && value != null) node.setAttribute(key, value);
+    }
+    for (const kid of kids.flat()) if (kid != null) node.append(kid);
+    return node;
+  };
+  if (location.protocol === "file:") {
+    $("#empty").replaceChildren(
+      el("h2", {}, "Start Clipper first"),
+      el("p", { class: "muted" }, "This page was opened straight from a file, so there is no app running behind it. Double-click start.bat in the clipper folder (or run python app.py), and Clipper will open at http://127.0.0.1:8765."));
+    return;
+  }
+  const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
+  const round1 = (n) => Math.round(n * 10) / 10;
+
+  const fmt = (t, precise = true) => {
+    t = round1(Math.max(0, t || 0));
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+    const sec = precise ? s.toFixed(1).padStart(4, "0") : String(Math.floor(s)).padStart(2, "0");
+    return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+  };
+  const parse = (text) => {
+    const parts = text.trim().split(":").map(Number);
+    if (!parts.length || parts.length > 3 || parts.some((p) => Number.isNaN(p) || p < 0)) return null;
+    return parts.reduce((acc, p) => acc * 60 + p, 0);
+  };
+
+  const api = async (url, options) => {
+    const res = await fetch(url, options);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    return data;
+  };
+
+  const player = $("#player"), track = $("#track");
+  const state = { lib: { sources: [], clips: [], tools: {} }, src: null, start: 0, end: 10, watching: false };
+  const dur = () => (Number.isFinite(player.duration) && player.duration > 0 ? player.duration : state.src?.duration || 0);
+
+  /* ------------------------------------------------------------ library */
+  async function loadLibrary() {
+    state.lib = await api("/api/library");
+    if (state.src) {
+      const fresh = state.lib.sources.find((s) => s.id === state.src.id);
+      if (fresh) state.src = fresh;
+      else clearSource();
+    }
+    renderSources();
+    renderClips();
+    fillBgOptions();
+    renderMoments();
+    updateAiUi();
+    const ok = state.lib.tools.ytdlp;
+    $("#ytGo").disabled = !ok;
+    $("#ytHint").textContent = ok
+      ? "Only download videos you own or have permission to reuse."
+      : "YouTube downloads need yt-dlp. Run: pip install -U yt-dlp, then restart Clipper.";
+  }
+
+  function renderSources() {
+    const list = $("#sources");
+    list.replaceChildren();
+    if (!state.lib.sources.length) {
+      list.append(el("li", { class: "muted small" }, "Videos you add appear here."));
+      return;
+    }
+    for (const s of state.lib.sources) {
+      list.append(el("li", { class: "src" + (state.src?.id === s.id ? " on" : "") },
+        el("button", { class: "src-main", onclick: () => selectSource(s.id) },
+          el("span", { class: "src-title" }, s.title),
+          el("span", { class: "src-meta" }, el("span", {}, fmt(s.duration, false)), el("span", {}, s.origin === "youtube" ? "YouTube" : "Upload"))),
+        el("button", { class: "icon", title: "Remove from library", "aria-label": `Remove ${s.title}`, onclick: () => removeSource(s) }, "×")));
+    }
+  }
+
+  const clipNodes = new Map();
+  let clipLimit = 24;
+
+  function clipCard(c) {
+    const url = `/media/clips/${encodeURIComponent(c.file)}`;
+    const media = c.has_video
+      ? el("video", { src: url, controls: true, preload: "metadata", playsinline: true })
+      : el("audio", { src: url, controls: true, preload: "metadata" });
+    return el("li", { class: "clip" }, media,
+      el("div", { class: "clip-body" },
+        el("span", { class: "clip-name" }, c.name),
+        el("span", { class: "clip-meta" }, c.kind === "script"
+          ? `${fmt(c.end)} long, made from a script`
+          : c.kind === "summary"
+            ? `${fmt(c.end - c.start)} long (summary of ${c.source_title})`
+            : `${fmt(c.end - c.start)} long${c.kind === "short" ? " (vertical short)" : ""}, from ${fmt(c.start)} in ${c.source_title}`),
+        el("div", { class: "clip-actions" },
+          el("a", { href: `${url}?download=1`, download: c.file }, "Download"),
+          c.has_video ? el("button", { type: "button", onclick: () => toggleYoutubeForm(c) }, "Upload to YouTube") : null,
+          el("button", { type: "button", onclick: () => removeClip(c) }, "Delete")),
+        c.has_video ? youtubeForm(c) : null));
+  }
+
+  /* --------------------------------------------------------- publish to YouTube */
+  let ytConnected = false;
+  const ytForms = new Map();
+
+  function youtubeForm(c) {
+    const wrap = el("div", { class: "yt-upload", hidden: true });
+    ytForms.set(c.id, wrap);
+    return wrap;
+  }
+
+  function buildYoutubeForm(c, wrap) {
+    if (wrap.childNodes.length) return;   // already built
+    const title = el("input", { type: "text", value: c.name.replace(/_/g, " ").slice(0, 100), maxlength: 100, "aria-label": "Title" });
+    const desc = el("textarea", { rows: 3, placeholder: "Description (optional)", "aria-label": "Description" });
+    const tags = el("input", { type: "text", placeholder: "Tags, comma separated (optional)", "aria-label": "Tags" });
+    const privacy = el("select", { "aria-label": "Privacy" },
+      el("option", { value: "private", selected: true }, "Private (only you)"),
+      el("option", { value: "unlisted" }, "Unlisted (anyone with the link)"),
+      el("option", { value: "public" }, "Public"));
+    const category = el("select", { "aria-label": "Category" },
+      ...Object.entries({ "22": "People & Blogs", "24": "Entertainment", "23": "Comedy", "27": "Education",
+        "20": "Gaming", "10": "Music", "17": "Sports", "26": "Howto & Style", "25": "News & Politics",
+        "28": "Science & Technology", "19": "Travel & Events", "1": "Film & Animation" })
+        .map(([v, t]) => el("option", { value: v, selected: v === "22" }, t)));
+    const kids = el("input", { type: "checkbox" });
+    const button = el("button", { class: "btn primary", type: "button" }, "Upload");
+    const msg = el("p", { class: "small muted" });
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      const row = addJobRow(`Uploading "${title.value || c.name}" to YouTube`);
+      try {
+        const job = await api("/api/youtube/upload", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({
+          clip_id: c.id, title: title.value, description: desc.value, tags: tags.value,
+          privacy: privacy.value, category: category.value, made_for_kids: kids.checked }) });
+        const done = await pollJob(job.id, row);
+        if (done?.status === "done") {
+          msg.textContent = `Uploaded as ${done.result.privacy}: ${done.result.url}`;
+        } else if (done) {
+          msg.textContent = done.message;
+        }
+      } catch (err) {
+        row.fail(err.message);
+        msg.textContent = err.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+    wrap.append(
+      el("div", { class: "field" }, el("label", {}, "Title"), title),
+      el("div", { class: "field" }, el("label", {}, "Description"), desc),
+      el("div", { class: "field" }, el("label", {}, "Tags"), tags),
+      el("div", { class: "ai-row" },
+        el("div", { class: "field" }, el("label", {}, "Privacy"), privacy),
+        el("div", { class: "field" }, el("label", {}, "Category"), category),
+        el("label", { class: "field" }, kids, " Made for kids")),
+      button, msg);
+  }
+
+  function toggleYoutubeForm(c) {
+    const wrap = ytForms.get(c.id);
+    if (!wrap) return;
+    if (!ytConnected) {
+      alert("Connect your YouTube channel first, in the \u201cPublish to YouTube\u201d box on the left.");
+      return;
+    }
+    buildYoutubeForm(c, wrap);
+    wrap.hidden = !wrap.hidden;
+  }
+
+  async function refreshYoutubeStatus() {
+    try {
+      const status = await api("/api/youtube/status");
+      ytConnected = status.connected;
+      $("#ytConnected").hidden = !status.connected;
+      $("#ytCredForm").hidden = status.connected;
+      if (status.connected) $("#ytChannelName").textContent = status.channel.title;
+      if (status.has_credentials && !status.connected) {
+        $("#ytClientId").value = ""; $("#ytClientSecret").value = "";
+        $("#ytConnectStatus").textContent = status.error || "Not connected yet. Click Connect to sign in with Google.";
+      } else {
+        $("#ytConnectStatus").textContent = "";
+      }
+    } catch { /* left as-is; the sidebar just won't show a channel yet */ }
+  }
+  $("#ytCredForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = $("#ytConnectBtn");
+    button.disabled = true;
+    try {
+      const { auth_url } = await api("/api/youtube/connect", { method: "POST", headers: JSON_HEADERS,
+        body: JSON.stringify({ client_id: $("#ytClientId").value.trim(), client_secret: $("#ytClientSecret").value.trim() }) });
+      window.open(auth_url, "_blank", "noopener");
+      $("#ytConnectStatus").textContent = "Finish signing in with Google in the new tab, then come back here.";
+      let tries = 0;
+      const poll = setInterval(async () => {
+        await refreshYoutubeStatus();
+        if (ytConnected || ++tries > 60) clearInterval(poll);
+      }, 3000);
+    } catch (err) {
+      $("#ytConnectStatus").textContent = err.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+  $("#ytDisconnect").addEventListener("click", async () => {
+    if (!confirm("Disconnect this YouTube channel from Clipper?")) return;
+    await api("/api/youtube/disconnect", { method: "POST" });
+    await refreshYoutubeStatus();
+  });
+  refreshYoutubeStatus();
+
+  function renderClips() {
+    const list = $("#clips");
+    const clips = state.lib.clips;
+    const shown = clips.slice(0, clipLimit);
+    $("#noClips").hidden = clips.length > 0;
+    $("#clipsTools").hidden = clips.length === 0;
+    const wanted = new Set(shown.map((c) => c.id));
+    for (const [id, node] of clipNodes) {
+      if (!wanted.has(id)) { node.remove(); clipNodes.delete(id); }
+    }
+    let previous = null;
+    for (const c of shown) {
+      let node = clipNodes.get(c.id);
+      if (!node) { node = clipCard(c); clipNodes.set(c.id, node); }
+      const expected = previous ? previous.nextSibling : list.firstChild;
+      if (node.parentNode !== list || node !== expected) list.insertBefore(node, expected);   // playing videos are left alone
+      previous = node;
+    }
+    const left = clips.length - shown.length;
+    $("#clipsMore").hidden = left <= 0;
+    $("#clipsMoreBtn").textContent = `Show more (${left} more)`;
+  }
+  $("#clipsMoreBtn").addEventListener("click", () => { clipLimit += 24; renderClips(); });
+
+  async function removeSource(s) {
+    if (!confirm(`Remove "${s.title}" and its downloaded file? Clips you've already made are kept.`)) return;
+    await api(`/api/sources/${s.id}`, { method: "DELETE" });
+    await loadLibrary();
+  }
+  async function removeClip(c) {
+    if (!confirm(`Delete the clip "${c.name}"?`)) return;
+    await api(`/api/clips/${c.id}`, { method: "DELETE" });
+    await loadLibrary();
+  }
+
+  /* ------------------------------------------------------------- editor */
+  function clearSource() {
+    state.src = null;
+    player.removeAttribute("src");
+    player.load();
+    $("#editor").hidden = true;
+    $("#empty").hidden = false;
+  }
+
+  function selectSource(id) {
+    const s = state.lib.sources.find((x) => x.id === id);
+    if (!s) return;
+    state.src = s;
+    state.watching = false;
+    $("#empty").hidden = true;
+    $("#editor").hidden = false;
+    $("#srcTitle").textContent = s.title;
+    const meta = $("#srcMeta");
+    const parts = [`${fmt(s.duration, false)} long` + (s.width ? `, ${s.width}×${s.height}` : ", audio only")];
+    if (s.origin === "youtube") {
+      parts[0] += ", from ";
+      parts.push(s.url ? el("a", { href: s.url, target: "_blank", rel: "noreferrer" }, "YouTube") : "YouTube");
+    }
+    meta.replaceChildren(...parts);
+    player.src = `/media/sources/${encodeURIComponent(s.preview)}`;
+    player.load();
+    state.start = 0;
+    state.end = round1(Math.min(s.duration || 10, 10));
+    const mode = $("#mode");
+    mode.value = s.has_video ? "mp4" : "mp3";
+    for (const opt of mode.options) opt.disabled = !s.has_video && opt.value !== "mp3";
+    $("#formMsg").textContent = "";
+    $("#aiMsg").textContent = "";
+    renderSources();
+    fillBgOptions();
+    renderMoments();
+    updateAiUi();
+    syncShortOpts();
+    updateUI();
+  }
+
+  function setStart(t) { const d = dur(); if (d) state.start = round1(clamp(t, 0, Math.max(0, state.end - 0.1))); updateUI(); }
+  function setEnd(t) { const d = dur(); if (d) state.end = round1(clamp(t, state.start + 0.1, d)); updateUI(); }
+
+  function updateUI() {
+    const d = dur() || 1;
+    track.style.setProperty("--s", (state.start / d) * 100);
+    track.style.setProperty("--e", (state.end / d) * 100);
+    if (document.activeElement !== $("#startIn")) $("#startIn").value = fmt(state.start);
+    if (document.activeElement !== $("#endIn")) $("#endIn").value = fmt(state.end);
+    $("#len").textContent = fmt(state.end - state.start);
+    $("#total").textContent = fmt(d, false);
+    for (const [id, value] of [["#hStart", state.start], ["#hEnd", state.end]]) {
+      const h = $(id);
+      h.setAttribute("aria-valuemin", 0);
+      h.setAttribute("aria-valuemax", d);
+      h.setAttribute("aria-valuenow", value);
+      h.setAttribute("aria-valuetext", fmt(value));
+    }
+    updatePlayhead();
+  }
+
+  function updatePlayhead() {
+    const d = dur() || 1;
+    track.style.setProperty("--p", (clamp(player.currentTime, 0, d) / d) * 100);
+    $("#now").textContent = `Playhead ${fmt(player.currentTime)}`;
+  }
+
+  function loop() {
+    updatePlayhead();
+    if (state.watching && player.currentTime >= state.end) {
+      player.pause();
+      state.watching = false;
+      player.currentTime = state.end;
+    }
+    if (!player.paused) requestAnimationFrame(loop);
+  }
+
+  function playSelection() {
+    if (!state.src) return;
+    player.currentTime = state.start;
+    state.watching = true;
+    player.play();
+  }
+
+  player.addEventListener("play", () => requestAnimationFrame(loop));
+  player.addEventListener("pause", () => { state.watching = false; updatePlayhead(); });
+  player.addEventListener("seeked", updatePlayhead);
+  player.addEventListener("timeupdate", updatePlayhead);
+  player.addEventListener("loadedmetadata", () => {
+    if (Number.isFinite(player.duration) && state.src) state.end = round1(Math.min(state.end, player.duration));
+    updateUI();
+  });
+
+  /* ---------------------------------------------------------- timeline */
+  const timeFromPointer = (e) => {
+    const rect = track.getBoundingClientRect();
+    return clamp((e.clientX - rect.left) / rect.width, 0, 1) * dur();
+  };
+  track.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".handle") || !state.src) return;
+    player.currentTime = timeFromPointer(e);
+  });
+
+  function wireHandle(handle, which) {
+    const get = () => (which === "start" ? state.start : state.end);
+    const set = (t) => (which === "start" ? setStart(t) : setEnd(t));
+    handle.addEventListener("pointerdown", (e) => {
+      handle.setPointerCapture(e.pointerId);
+      handle.dataset.drag = "1";
+      handle.focus();
+      e.preventDefault();
+    });
+    handle.addEventListener("pointermove", (e) => {
+      if (!handle.dataset.drag) return;
+      set(timeFromPointer(e));
+      player.currentTime = get();
+    });
+    const stop = () => delete handle.dataset.drag;
+    handle.addEventListener("pointerup", stop);
+    handle.addEventListener("pointercancel", stop);
+    handle.addEventListener("keydown", (e) => {
+      const step = e.shiftKey ? 1 : 0.1;
+      let delta = 0;
+      if (e.key === "ArrowLeft" || e.key === "ArrowDown") delta = -step;
+      else if (e.key === "ArrowRight" || e.key === "ArrowUp") delta = step;
+      else return;
+      e.preventDefault();
+      set(get() + delta);
+      player.currentTime = get();
+    });
+  }
+  wireHandle($("#hStart"), "start");
+  wireHandle($("#hEnd"), "end");
+
+  for (const [inputId, setter, getter] of [["#startIn", setStart, () => state.start], ["#endIn", setEnd, () => state.end]]) {
+    $(inputId).addEventListener("change", (e) => {
+      const t = parse(e.target.value);
+      if (t == null) e.target.value = fmt(getter());
+      else setter(t);
+      e.target.value = fmt(getter());
+    });
+  }
+  $("#setStart").addEventListener("click", () => setStart(player.currentTime));
+  $("#setEnd").addEventListener("click", () => setEnd(player.currentTime));
+  $("#playSel").addEventListener("click", playSelection);
+
+  document.addEventListener("keydown", (e) => {
+    if (!state.src || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.matches("input, select, textarea")) return;
+    const key = e.key.toLowerCase();
+    if (key === "i") setStart(player.currentTime);
+    else if (key === "o") setEnd(player.currentTime);
+    else if (key === "p") playSelection();
+    else if (e.key === " " && e.target === document.body) {
+      e.preventDefault();
+      player.paused ? player.play() : player.pause();
+    }
+  });
+
+  /* -------------------------------------------------------------- jobs */
+  function addJobRow(label) {
+    const msg = el("div", { class: "msg muted" }, "Starting");
+    const fill = el("i");
+    const row = el("li", { class: "job" }, el("div", { class: "label" }, label), msg, el("div", { class: "bar" }, fill));
+    $("#jobs").prepend(row);
+    return {
+      set(message, progress) { msg.textContent = message; fill.style.width = `${clamp(progress, 0, 1) * 100}%`; },
+      done() { fill.style.width = "100%"; setTimeout(() => row.remove(), 1200); },
+      fail(message) {
+        row.classList.add("error");
+        msg.textContent = message;
+        row.querySelector(".bar")?.remove();
+        row.append(el("button", { type: "button", onclick: () => row.remove() }, "Dismiss"));
+      },
+    };
+  }
+
+  function pollJob(id, row) {
+    return new Promise((resolve) => {
+      const tick = async () => {
+        try {
+          const job = await api(`/api/jobs/${id}`);
+          row.set(job.message, job.progress);
+          if (job.status === "running") return setTimeout(tick, 600);
+          job.status === "done" ? row.done() : row.fail(job.message);
+          resolve(job);
+        } catch (err) {
+          row.fail(err.message);
+          resolve(null);
+        }
+      };
+      tick();
+    });
+  }
+
+  async function afterSourceJob(job) {
+    if (job?.status !== "done") return;
+    await loadLibrary();
+    selectSource(job.result.source_id);
+  }
+
+  /* ------------------------------------------------------ add a video */
+  function uploadFile(file) {
+    const row = addJobRow(file.name);
+    row.set("Uploading", 0);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload");
+    xhr.upload.onprogress = (e) => e.lengthComputable && row.set("Uploading", e.loaded / e.total);
+    xhr.onerror = () => row.fail("Upload failed. Is Clipper still running?");
+    xhr.onload = async () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch { /* keep empty */ }
+      if (xhr.status !== 200) return row.fail(data.error || "Upload failed");
+      afterSourceJob(await pollJob(data.id, row));
+    };
+    const body = new FormData();
+    body.append("file", file);
+    xhr.send(body);
+  }
+
+  const drop = $("#drop");
+  $("#file").addEventListener("change", (e) => { [...e.target.files].forEach(uploadFile); e.target.value = ""; });
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("over");
+    [...e.dataTransfer.files].forEach(uploadFile);
+  });
+
+  $("#ytForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const url = $("#ytUrl").value.trim();
+    const row = addJobRow(url);
+    try {
+      const job = await api("/api/youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, quality: $("#ytQuality").value }),
+      });
+      $("#ytUrl").value = "";
+      afterSourceJob(await pollJob(job.id, row));
+    } catch (err) {
+      row.fail(err.message);
+    }
+  });
+
+  /* ------------------------------------------------------- create clip */
+  const JSON_HEADERS = { "Content-Type": "application/json" };
+  const smooth = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
+
+  function clipPayload(extra = {}) {
+    const payload = { source_id: state.src.id, start: state.start, end: state.end, mode: $("#mode").value, name: $("#clipName").value };
+    Object.assign(payload, extra);
+    if (payload.mode === "short") {
+      Object.assign(payload, { layout: $("#layout").value, bg_id: $("#bgVideo").value, captions: $("#capStyle").value, caption_pos: $("#capPos").value, caption_color: $("#capColor").value, language: $("#capLang").value, caption_script: $("#capScript").value, hook_text: $("#clHook").value.trim(), ...musicPayload("cl") });
+    }
+    return payload;
+  }
+
+  async function startClip(payload, label) {
+    const row = addJobRow(label);
+    let job;
+    try {
+      job = await api("/api/clip", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload) });
+    } catch (err) {
+      row.fail(err.message);
+      throw err;
+    }
+    const finished = await pollJob(job.id, row);
+    if (finished?.status === "done") {
+      await loadLibrary();
+      $("#clipsSection").scrollIntoView({ behavior: smooth() });
+    }
+  }
+
+  $("#clipForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!state.src) return;
+    const button = $("#clipGo"), message = $("#formMsg");
+    message.textContent = "";
+    button.disabled = true;
+    try {
+      const payload = clipPayload();
+      $("#clipName").value = "";
+      await startClip(payload, `${payload.mode === "short" ? "Short" : "Clip"} from ${state.src.title}`);
+    } catch (err) {
+      message.textContent = err.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  /* ------------------------------------------------ shorts: options and tabs */
+  const LANGS = [["auto", "Auto-detect"], ["en", "English"], ["hi", "Hindi"], ["es", "Spanish"], ["fr", "French"], ["de", "German"],
+                 ["pt", "Portuguese"], ["ar", "Arabic"], ["ta", "Tamil"], ["te", "Telugu"], ["bn", "Bengali"], ["mr", "Marathi"]];
+  for (const sel of [$("#aiLang"), $("#capLang")]) sel.replaceChildren(...LANGS.map(([v, t]) => el("option", { value: v }, t)));
+
+  function syncShortOpts() {
+    const short = $("#mode").value === "short";
+    $("#shortOpts").hidden = !short;
+    $("#bgWrap").hidden = !(short && $("#layout").value === "split");
+  }
+  $("#mode").addEventListener("change", syncShortOpts);
+  $("#layout").addEventListener("change", syncShortOpts);
+
+  function fillBgOptions() {
+    const videos = state.lib.sources.filter((s) => s.has_video);
+    const others = videos.filter((s) => s.id !== state.src?.id);
+    const bg = $("#bgVideo"), keep = bg.value;
+    bg.replaceChildren(...(others.length
+      ? others.map((s) => el("option", { value: s.id }, s.title))
+      : [el("option", { value: "" }, "Add another video to the library first")]));
+    if (others.some((s) => s.id === keep)) bg.value = keep;
+
+    const sb = $("#scriptBg"), keepScript = sb.value;
+    const colors = [["#101320", "Dark navy"], ["#000000", "Black"], ["#2a1a5e", "Deep purple"], ["#0f3b2e", "Forest green"], ["#5e1a2a", "Wine red"]];
+    sb.replaceChildren(
+      ...colors.map(([c, name]) => el("option", { value: `color:${c}` }, `Solid: ${name}`)),
+      ...videos.map((s) => el("option", { value: `video:${s.id}` }, `Video: ${s.title}`)));
+    if ([...sb.options].some((o) => o.value === keepScript)) sb.value = keepScript;
+    fillBatchOptions(videos);
+    fillMusicOptions();
+  }
+
+  /* Background music: any file in the library can be the music (audio files first). */
+  const MUSIC_PREFIXES = ["cl", "sc", "bs", "bh", "sm"];
+  function syncMusic(p) {
+    const on = $(`#${p}Music`).value !== "";
+    $(`#${p}MusicVolWrap`).hidden = !on;
+    $(`#${p}MusicLenWrap`).hidden = !on;
+  }
+  function fillMusicOptions() {
+    const tracks = [...state.lib.sources].sort((a, b) => Number(a.has_video) - Number(b.has_video));
+    for (const p of MUSIC_PREFIXES) {
+      const sel = $(`#${p}Music`), keep = sel.value;
+      sel.replaceChildren(
+        el("option", { value: "" }, tracks.some((s) => !s.has_video) ? "No music" : "No music (add an MP3 to the library to use one)"),
+        ...tracks.map((s) => el("option", { value: s.id }, (s.has_video ? "Sound of video: " : "Audio: ") + s.title)));
+      if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+      syncMusic(p);
+    }
+  }
+  function musicPayload(p) {
+    const id = $(`#${p}Music`).value;
+    return id ? { music_id: id, music_volume: Number($(`#${p}MusicVol`).value), music_seconds: Number($(`#${p}MusicLen`).value) } : {};
+  }
+  for (const p of MUSIC_PREFIXES) $(`#${p}Music`).addEventListener("change", () => syncMusic(p));
+  function syncHookMode() { $("#bhHookTextWrap").hidden = $("#bhHookMode").value !== "same"; }
+  $("#bhHookMode").addEventListener("change", syncHookMode);
+  syncHookMode();
+
+
+
+  for (const tab of document.querySelectorAll(".tab")) {
+    tab.addEventListener("click", () => {
+      for (const t of document.querySelectorAll(".tab")) {
+        t.classList.toggle("on", t === tab);
+        t.setAttribute("aria-selected", t === tab);
+      }
+      $("#tab-clip").hidden = tab.dataset.tab !== "clip";
+      $("#tab-script").hidden = tab.dataset.tab !== "script";
+      $("#tab-batch").hidden = tab.dataset.tab !== "batch";
+    });
+  }
+
+  /* ------------------------------------------------------ AI: key + moments */
+  const AI_HINT = "Add your Gemini or Anthropic API key under AI settings (on the left) to use this.";
+  function updateAiUi() {
+    const t = state.lib.tools || {};
+    $("#aiStatus").textContent = t.ai ? (t.ai_from_env ? "Using the key set on the server." : "Key saved.") : "No key yet. It is only needed for the AI features.";
+    $("#aiClear").hidden = !t.ai || t.ai_from_env;
+    $("#aiFind").disabled = !t.ai;
+    $("#clHookWrite").disabled = !t.ai;
+    $("#sumGo").disabled = !t.ai;
+    $("#aiWrite").disabled = !t.ai;
+    const msg = $("#aiMsg");
+    if (!t.ai) msg.textContent = AI_HINT;
+    else if (msg.textContent === AI_HINT) msg.textContent = "";
+  }
+
+  async function saveKey(key) {
+    await api("/api/settings", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ anthropic_key: key }) });
+    $("#aiKey").value = "";
+    await loadLibrary();
+  }
+  $("#aiForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const key = $("#aiKey").value.trim();
+    if (!key) return;
+    try { await saveKey(key); } catch (err) { $("#aiStatus").textContent = err.message; }
+  });
+  $("#aiClear").addEventListener("click", () => saveKey("").catch((err) => { $("#aiStatus").textContent = err.message; }));
+
+  function setRange(start, end) {
+    state.start = round1(start);
+    state.end = round1(end);
+    updateUI();
+  }
+
+  function renderMoments() {
+    const list = $("#moments");
+    list.replaceChildren();
+    for (const m of state.src?.moments || []) {
+      list.append(el("li", { class: "moment" },
+        el("div", { class: "moment-top" }, el("strong", {}, m.title), el("span", { class: "score", title: "Potential, from 1 to 10" }, `${m.score}/10`)),
+        el("div", { class: "clip-meta" }, `${fmt(m.start)} to ${fmt(m.end)}, ${Math.round(m.end - m.start)} seconds`),
+        m.reason ? el("p", { class: "small muted" }, m.reason) : null,
+        el("div", { class: "clip-actions" },
+          el("button", { type: "button", onclick: () => { setRange(m.start, m.end); playSelection(); } }, "Preview"),
+          el("button", { type: "button", onclick: () => setRange(m.start, m.end) }, "Use this range"),
+          el("button", { type: "button", onclick: () => makeShortFrom(m) }, "Make short"))));
+    }
+  }
+
+  function makeShortFrom(m) {
+    if (!state.src) return;
+    setRange(m.start, m.end);
+    startClip(clipPayload({ mode: "short", start: m.start, end: m.end, name: m.title }), `Short: ${m.title}`).catch(() => {});
+  }
+
+  /* ---------------------------------------------------------- summary video */
+  $("#sumLang").replaceChildren(...LANGS.map(([v, t]) => el("option", { value: v }, t)));
+  api("/api/voices").then(({ voices, rates }) => {
+    $("#sumVoice").replaceChildren(...voices.map((v) => el("option", { value: v.id }, v.label)));
+    $("#sumRate").replaceChildren(...rates.map((r) => el("option", { value: r.id, selected: r.id === "+0%" }, r.label)));
+  }).catch(() => {});
+  function syncSummary() { $("#sumNarrOpts").hidden = $("#sumStyle").value !== "explained"; }
+  $("#sumStyle").addEventListener("change", syncSummary);
+  syncSummary();
+
+  $("#sumGo").addEventListener("click", async () => {
+    if (!state.src) return;
+    const button = $("#sumGo"), msg = $("#sumMsg");
+    msg.textContent = "";
+    button.disabled = true;
+    const row = addJobRow(`Summary of ${state.src.title}`);
+    try {
+      const job = await api("/api/summary", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({
+        source_id: state.src.id, minutes: Number($("#sumMinutes").value), style: $("#sumStyle").value,
+        language: $("#sumLang").value, narration: $("#sumNarr").value, voice: $("#sumVoice").value,
+        rate: $("#sumRate").value, keep_sound: $("#sumKeep").value, captions: $("#sumCap").value,
+        caption_pos: $("#sumPos").value, caption_color: $("#sumColor").value, ...musicPayload("sm") }) });
+      const done = await pollJob(job.id, row);
+      if (done?.status === "done") {
+        await loadLibrary();
+        $("#clipsSection").scrollIntoView({ behavior: smooth() });
+      } else if (done) {
+        msg.textContent = done.message;
+      }
+    } catch (err) {
+      row.fail(err.message);
+      msg.textContent = err.message;
+    } finally {
+      button.disabled = !state.lib.tools.ai;
+    }
+  });
+
+  $("#aiFind").addEventListener("click", async () => {
+    if (!state.src) return;
+    const [min_len, max_len] = $("#aiLen").value.split("-").map(Number);
+    const button = $("#aiFind"), msg = $("#aiMsg");
+    msg.textContent = "";
+    button.disabled = true;
+    const row = addJobRow(`Finding moments in ${state.src.title}`);
+    try {
+      const job = await api("/api/moments", { method: "POST", headers: JSON_HEADERS,
+        body: JSON.stringify({ source_id: state.src.id, count: Number($("#aiCount").value), min_len, max_len, language: $("#aiLang").value }) });
+      const done = await pollJob(job.id, row);
+      if (done?.status === "done") {
+        await loadLibrary();
+        if (!state.src?.moments?.length) msg.textContent = "The AI didn't find clear standalone moments in this video. Try a different clip length.";
+      } else if (done) {
+        msg.textContent = done.message;
+      }
+    } catch (err) {
+      row.fail(err.message);
+      msg.textContent = err.message;
+    } finally {
+      button.disabled = !state.lib.tools.ai;
+    }
+  });
+
+  /* ---------------------------------------------------------- script to video */
+  api("/api/voices").then(({ voices, rates }) => {
+    $("#voice").replaceChildren(...voices.map((v) => el("option", { value: v.id }, v.label)));
+    $("#rate").replaceChildren(...rates.map((r) => el("option", { value: r.id, selected: r.id === "+0%" }, r.label)));
+  }).catch(() => {});
+
+  $("#aiWrite").addEventListener("click", async () => {
+    const topic = $("#aiTopic").value.trim(), msg = $("#scriptMsg"), button = $("#aiWrite");
+    msg.textContent = "";
+    if (topic.length < 3) { msg.textContent = "Type a topic first."; return; }
+    button.disabled = true;
+    const row = addJobRow("Writing a script");
+    try {
+      const job = await api("/api/script/write", { method: "POST", headers: JSON_HEADERS,
+        body: JSON.stringify({ topic, seconds: Number($("#aiSeconds").value), language: $("#aiScriptLang").value }) });
+      const done = await pollJob(job.id, row);
+      if (done?.status === "done") $("#scriptText").value = done.result.script;
+    } catch (err) {
+      row.fail(err.message);
+      msg.textContent = err.message;
+    } finally {
+      button.disabled = !state.lib.tools.ai;
+    }
+  });
+
+  $("#clHookWrite").addEventListener("click", async () => {
+    if (!state.src) return;
+    const button = $("#clHookWrite"), input = $("#clHook"), message = $("#formMsg");
+    message.textContent = "";
+    button.disabled = true;
+    const row = addJobRow("Writing a hook");
+    try {
+      const job = await api("/api/hook/write", { method: "POST", headers: JSON_HEADERS,
+        body: JSON.stringify({ source_id: state.src.id, start: state.start, end: state.end, language: $("#capLang").value }) });
+      const done = await pollJob(job.id, row);
+      if (done?.status === "done") input.value = done.result.hook;
+      else if (done) message.textContent = done.message;
+    } catch (err) {
+      row.fail(err.message);
+      message.textContent = err.message;
+    } finally {
+      button.disabled = !state.lib.tools.ai;
+    }
+  });
+
+  $("#scriptForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("#scriptMsg"), button = $("#scriptGo");
+    msg.textContent = "";
+    const script = $("#scriptText").value.trim();
+    if (!script) { msg.textContent = "Write a script first."; return; }
+    const bg = $("#scriptBg").value;
+    const payload = {
+      script, voice: $("#voice").value, rate: $("#rate").value, captions: $("#sCapStyle").value,
+      caption_pos: $("#sCapPos").value, caption_color: $("#sCapColor").value, name: $("#scriptName").value, ...musicPayload("sc"),
+      ...(bg.startsWith("video:") ? { bg_type: "video", bg_id: bg.slice(6) } : { bg_type: "color", bg_color: bg.slice(6) }),
+    };
+    button.disabled = true;
+    const row = addJobRow("Video from a script");
+    try {
+      const job = await api("/api/script/video", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(payload) });
+      $("#scriptName").value = "";
+      const done = await pollJob(job.id, row);
+      if (done?.status === "done") {
+        await loadLibrary();
+        $("#clipsSection").scrollIntoView({ behavior: smooth() });
+      }
+    } catch (err) {
+      row.fail(err.message);
+      msg.textContent = err.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+
+  /* ---------------------------------------------------------------- batches */
+  const checked = new Set();
+  function fillBatchOptions(videos) {
+    const bb = $("#bsBg"), keepBg = bb.value;
+    const colors = [["#101320", "Dark navy"], ["#000000", "Black"], ["#2a1a5e", "Deep purple"], ["#0f3b2e", "Forest green"], ["#5e1a2a", "Wine red"]];
+    bb.replaceChildren(
+      el("option", { value: "random" }, videos.length ? "Random video from my library" : "Solid: Dark navy (add videos for more)"),
+      ...colors.map(([c, name]) => el("option", { value: `color:${c}` }, `Solid: ${name}`)),
+      ...videos.map((v) => el("option", { value: `video:${v.id}` }, `Video: ${v.title}`)));
+    if ([...bb.options].some((o) => o.value === keepBg)) bb.value = keepBg;
+
+    const list = $("#bhSources");
+    const known = new Set(videos.map((v) => v.id));
+    for (const id of [...checked]) if (!known.has(id)) checked.delete(id);
+    list.replaceChildren(...(videos.length ? videos.map((v) => el("label", {},
+      el("input", { type: "checkbox", value: v.id, checked: checked.has(v.id), onchange: (e) => { e.target.checked ? checked.add(v.id) : checked.delete(v.id); updateBatchCounts(); } }),
+      el("span", { class: "t" }, v.title), el("span", { class: "d" }, fmt(v.duration, false))))
+      : [el("p", { class: "muted small", style: "padding: 6px" }, "Add videos to the library first (left panel).")]));
+
+    const bg = $("#bhBg"), keep = bg.value;
+    bg.replaceChildren(el("option", { value: "random" }, "Random video from my library"), ...videos.map((v) => el("option", { value: v.id }, v.title)));
+    if ([...bg.options].some((o) => o.value === keep)) bg.value = keep;
+    updateBatchCounts();
+  }
+
+  function scriptEntries() {
+    const text = $("#bsText").value;
+    return $("#bsMode").value === "topics"
+      ? text.split("\n").map((l) => l.trim()).filter(Boolean)
+      : text.split(/\n\s*\n|^\s*---+\s*$/m).map((b) => b.trim()).filter(Boolean);
+  }
+
+  function minutesText(n, perVideo) {
+    const mins = Math.round((n * perVideo) / 60);
+    return mins < 2 ? "about a minute or two" : mins < 90 ? `roughly ${mins} minutes` : `roughly ${(mins / 60).toFixed(1)} hours`;
+  }
+
+  function updateBatchCounts() {
+    const n = scriptEntries().length;
+    const topics = $("#bsMode").value === "topics";
+    $("#bsCount").textContent = n ? `${n} video${n === 1 ? "" : "s"} queued, ${minutesText(n, 45)} on a typical PC${topics ? ", plus time for the AI to write each script" : ""}.` : "";
+    const per = Number($("#bhPer").value), vids = checked.size;
+    $("#bhCount").textContent = vids ? `${vids} video${vids === 1 ? "" : "s"} × up to ${per} shorts = up to ${vids * per} shorts, ${minutesText(vids * per, 40)}. ${$("#bhMode").value === "ai" ? "Long videos take a while to transcribe first." : ""}` : "";
+  }
+
+  function syncBatchForms() {
+    const topics = $("#bsMode").value === "topics";
+    $("#bsTextLabel").textContent = topics ? "Topics, one per line" : "Scripts, separated by a blank line";
+    $("#bsIdeas").hidden = !topics;
+    $("#bsAiOpts").hidden = !topics;
+    $("#bsLangWrap").hidden = !topics;
+    $("#bsHint").textContent = topics
+      ? "Each topic becomes a script written by the AI, then a video. Clipper leaves a short pause between videos so the free voice service isn't overloaded. Use a Hindi voice for Hindi scripts."
+      : "Separate scripts with a blank line. Clipper leaves a short pause between videos so the free voice service isn't overloaded. Use a Hindi voice for Hindi scripts.";
+    const ai = $("#bhMode").value === "ai";
+    $("#bhEvenWrap").hidden = ai;
+    $("#bhAiWrap").hidden = !ai;
+    $("#bhBgWrap").hidden = $("#bhLayout").value !== "split";
+    updateBatchCounts();
+  }
+  for (const id of ["#bsMode", "#bhMode", "#bhLayout", "#bhPer"]) $(id).addEventListener("change", syncBatchForms);
+  $("#bsText").addEventListener("input", updateBatchCounts);
+  $("#bhLang").replaceChildren(...LANGS.map(([v, t]) => el("option", { value: v }, t)));
+  $("#bhAll").addEventListener("click", () => { state.lib.sources.filter((s) => s.has_video).forEach((s) => checked.add(s.id)); fillBgOptions(); });
+  $("#bhNone").addEventListener("click", () => { checked.clear(); fillBgOptions(); });
+
+  api("/api/voices").then(({ voices, rates }) => {
+    $("#bsVoice").replaceChildren(
+      el("option", { value: "mix-en" }, "Rotate the English voices"),
+      el("option", { value: "mix-hi" }, "Rotate the Hindi voices"),
+      ...voices.map((v) => el("option", { value: v.id }, v.label)));
+    $("#bsRate").replaceChildren(...rates.map((r) => el("option", { value: r.id, selected: r.id === "+0%" }, r.label)));
+  }).catch(() => {});
+
+  $("#bsIdeasGo").addEventListener("click", async () => {
+    const niche = $("#bsNiche").value.trim(), msg = $("#bsMsg"), button = $("#bsIdeasGo");
+    msg.textContent = "";
+    if (niche.length < 3) { msg.textContent = "Describe the niche first."; return; }
+    button.disabled = true;
+    const row = addJobRow("Thinking up topics");
+    try {
+      const job = await api("/api/batch/ideas", { method: "POST", headers: JSON_HEADERS,
+        body: JSON.stringify({ niche, count: Number($("#bsIdeaCount").value), language: $("#bsIdeaLang").value, avoid: scriptEntries().slice(0, 150) }) });
+      const done = await pollJob(job.id, row);
+      if (done?.status === "done") {
+        const current = $("#bsText").value.trim();
+        $("#bsText").value = (current ? current + "\n" : "") + done.result.topics.join("\n");
+        updateBatchCounts();
+      }
+    } catch (err) {
+      row.fail(err.message);
+      msg.textContent = err.message;
+    } finally {
+      button.disabled = !state.lib.tools.ai;
+    }
+  });
+
+  $("#bsForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("#bsMsg"), button = $("#bsGo");
+    msg.textContent = "";
+    const entries = scriptEntries();
+    if (!entries.length) { msg.textContent = "Add at least one topic or script first."; return; }
+    if (entries.length > 20 && !confirm(`Start a batch of ${entries.length} videos? It will run for ${minutesText(entries.length, 45)}. You can pause it any time.`)) return;
+    button.disabled = true;
+    try {
+      await api("/api/batch/scripts", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({
+        mode: $("#bsMode").value, entries, voice: $("#bsVoice").value, rate: $("#bsRate").value, bg: $("#bsBg").value,
+        captions: $("#bsCapStyle").value, caption_pos: $("#bsCapPos").value, caption_color: $("#bsCapColor").value, seconds: Number($("#bsSeconds").value), language: $("#bsLang").value, ...musicPayload("bs") }) });
+      $("#bsText").value = "";
+      updateBatchCounts();
+      await loadBatches();
+      $("#batches").scrollIntoView({ behavior: smooth() });
+    } catch (err) {
+      msg.textContent = err.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("#bhForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("#bhMsg"), button = $("#bhGo");
+    msg.textContent = "";
+    if (!checked.size) { msg.textContent = "Pick at least one video."; return; }
+    const [min_len, max_len] = $("#bhLen").value.split("-").map(Number);
+    button.disabled = true;
+    try {
+      await api("/api/batch/shorts", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({
+        source_ids: [...checked], per_source: Number($("#bhPer").value), mode: $("#bhMode").value, seg_len: Number($("#bhSeg").value), min_len, max_len,
+        layout: $("#bhLayout").value, bg_id: $("#bhBg").value, captions: $("#bhCapStyle").value, caption_pos: $("#bhCapPos").value, caption_color: $("#bhCapColor").value, language: $("#bhLang").value, caption_script: $("#bhScript").value, hook_mode: $("#bhHookMode").value, hook_text: $("#bhHookText").value.trim(), ...musicPayload("bh") }) });
+      await loadBatches();
+      $("#batches").scrollIntoView({ behavior: smooth() });
+    } catch (err) {
+      msg.textContent = err.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  /* batch progress cards: updated in place so open lists and playing videos are not disturbed */
+  const batchNodes = new Map();
+  const lastDone = new Map();
+  let batchTimer = null;
+  const STATUS_TEXT = { running: "Running", queued: "Waiting", paused: "Paused", done: "Finished", error: "Stopped" };
+  const ITEM_TEXT = { queued: "Waiting", running: "Working", done: "Done", error: "Failed" };
+
+  async function batchAction(id, action) {
+    try { await api(`/api/batches/${id}/${action}`, { method: "POST" }); } catch (err) { alert(err.message); }
+    await loadBatches();
+  }
+
+  function buildBatchCard(b) {
+    const refs = {
+      title: el("strong", {}), chip: el("span", { class: "chip" }), fill: el("i"), stats: el("div", { class: "small muted" }),
+      stage: el("div", { class: "small" }), actions: el("div", { class: "batch-actions" }), list: el("ul", { class: "batch-items" }), lastStatus: null,
+    };
+    const details = el("details", { ontoggle: () => { if (details.open) fillBatchItems(refs, batchNodes.get(b.id).data); } },
+      el("summary", {}, "Show every video"), refs.list);
+    refs.details = details;
+    const bar = el("div", { class: "bigbar" }, refs.fill);
+    const node = el("li", { class: "batch" }, el("div", { class: "batch-top" }, refs.title, refs.chip), bar, refs.stats, refs.stage, refs.actions, details);
+    return { node, refs, data: b };
+  }
+
+  function fillBatchItems(refs, b) {
+    refs.list.replaceChildren(...b.items.map((i) => el("li", {},
+      el("span", { class: `s ${i.status}` }, ITEM_TEXT[i.status] || i.status),
+      el("span", { class: "l", title: i.error || i.label }, i.error ? `${i.label}: ${i.error}` : i.label))));
+    if (b.notes?.length) refs.list.prepend(...b.notes.map((n) => el("li", {}, el("span", { class: "s error" }, "Skipped"), el("span", { class: "l" }, n))));
+  }
+
+  function updateBatchCard(card, b) {
+    const { refs } = card;
+    card.data = b;
+    const when = new Date(b.created * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+    refs.title.textContent = `${b.title}, started ${when}`;
+    refs.chip.textContent = STATUS_TEXT[b.status] || b.status;
+    refs.chip.className = `chip ${b.status}${b.status === "done" && b.failed ? " bad" : ""}`;
+    const total = Math.max(b.total, b.done + b.failed, 1);
+    refs.fill.style.width = `${((b.done + b.failed) / total) * 100}%`;
+    refs.stats.textContent = `${b.done} of ${b.total} done${b.failed ? `, ${b.failed} failed` : ""}`;
+    refs.stage.textContent = b.stage;
+    if (refs.lastStatus !== `${b.status}/${b.failed}/${b.done > 0}`) {
+      refs.lastStatus = `${b.status}/${b.failed}/${b.done > 0}`;
+      const running = b.status === "running" || b.status === "queued";
+      refs.actions.replaceChildren(...[
+        running ? el("button", { type: "button", onclick: () => batchAction(b.id, "pause") }, "Pause") : null,
+        b.status === "paused" ? el("button", { type: "button", onclick: () => batchAction(b.id, "resume") }, "Resume") : null,
+        !running && b.failed ? el("button", { type: "button", onclick: () => batchAction(b.id, "retry") }, "Retry failed") : null,
+        b.done ? el("a", { href: `/api/batches/${b.id}/zip`, download: `clipper-batch-${b.id}.zip` }, "Download zip") : null,
+        !running ? el("button", { type: "button", class: "danger", onclick: async () => {
+          if (!confirm("Remove this batch from the list? The videos it made are kept in Your clips.")) return;
+          try { await api(`/api/batches/${b.id}`, { method: "DELETE" }); } catch (err) { alert(err.message); }
+          await loadBatches();
+        } }, "Remove") : null].filter(Boolean));
+    }
+    if (refs.details.open) fillBatchItems(refs, b);
+  }
+
+  function renderBatches(list) {
+    $("#noBatches").hidden = list.length > 0;
+    const ul = $("#batches");
+    const ids = new Set(list.map((b) => b.id));
+    for (const [id, card] of batchNodes) if (!ids.has(id)) { card.node.remove(); batchNodes.delete(id); }
+    let previous = null;
+    for (const b of list) {
+      let card = batchNodes.get(b.id);
+      if (!card) { card = buildBatchCard(b); batchNodes.set(b.id, card); }
+      updateBatchCard(card, b);
+      const expected = previous ? previous.nextSibling : ul.firstChild;
+      if (card.node.parentNode !== ul || card.node !== expected) ul.insertBefore(card.node, expected);
+      previous = card.node;
+    }
+  }
+
+  async function loadBatches() {
+    clearTimeout(batchTimer);
+    let list = [];
+    try { list = (await api("/api/batches")).batches; } catch { return; }
+    renderBatches(list);
+    let changed = false;
+    for (const b of list) {
+      if (lastDone.get(b.id) !== b.done) { if (lastDone.has(b.id)) changed = true; lastDone.set(b.id, b.done); }
+    }
+    if (changed) loadLibrary().catch(() => {});
+    if (list.some((b) => b.status === "running" || b.status === "queued")) batchTimer = setTimeout(loadBatches, 2000);
+  }
+
+  syncBatchForms();
+
+  loadBatches();
+  loadLibrary().catch((err) => { $("#empty").append(el("p", { class: "muted" }, `Couldn't load your library: ${err.message}`)); });
+})();
+</script>
+</body>
+</html>

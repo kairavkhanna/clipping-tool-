@@ -1,0 +1,4 @@
+# Caddy gets a free HTTPS certificate for your domain automatically.
+{$DOMAIN} {
+	reverse_proxy clipper:8765
+}
